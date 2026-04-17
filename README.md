@@ -11,8 +11,6 @@ Small interactive Python app built with Streamlit for uploading files to Azure B
 pip install -r requirements.txt
 ```
 
-3. Copy `.env.example` values into your shell environment or a local `.env` loader workflow.
-
 You can also create a local `.env` file in the project root. The app and Flask server load it automatically.
 
 Required configuration:
@@ -47,3 +45,4 @@ Then open `http://127.0.0.1:5000` in your browser.
 - File metadata preview before upload
 - Creates the container automatically if it does not already exist
 - Includes a local HTML frontend served by Flask
+- Returns a secure time-limited SAS link after upload for private storage accounts

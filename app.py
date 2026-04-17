@@ -1,10 +1,17 @@
 import os
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Optional
+from urllib.parse import urlparse
 
 import streamlit as st
 from azure.core.exceptions import AzureError
-from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.storage.blob import (
+    BlobSasPermissions,
+    BlobServiceClient,
+    ContentSettings,
+    generate_blob_sas,
+)
 from env_utils import load_local_env
 
 
@@ -26,6 +33,53 @@ def build_blob_service_client() -> BlobServiceClient:
         "Set AZURE_STORAGE_CONNECTION_STRING or both "
         "AZURE_STORAGE_ACCOUNT_URL and AZURE_STORAGE_ACCOUNT_KEY."
     )
+
+
+def resolve_account_name_and_key() -> tuple[str, str]:
+    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "").strip()
+    account_url = os.getenv("AZURE_STORAGE_ACCOUNT_URL", "").strip()
+    account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "").strip()
+
+    if connection_string:
+        parts = {}
+        for item in connection_string.split(";"):
+            if "=" in item:
+                key, value = item.split("=", 1)
+                parts[key.strip()] = value.strip()
+        account_name = parts.get("AccountName", "")
+        connection_account_key = parts.get("AccountKey", "")
+        if account_name and connection_account_key:
+            return account_name, connection_account_key
+
+    if account_url and account_key:
+        parsed = urlparse(account_url)
+        account_name = parsed.netloc.split(".")[0]
+        if account_name:
+            return account_name, account_key
+
+    raise RuntimeError(
+        "Unable to generate a secure blob link. Make sure the storage account key is available."
+    )
+
+
+def generate_sas_blob_url(container_name: str, blob_name: str, expiry_hours: int = 1) -> str:
+    account_name, account_key = resolve_account_name_and_key()
+    sas_token = generate_blob_sas(
+        account_name=account_name,
+        container_name=container_name,
+        blob_name=blob_name,
+        account_key=account_key,
+        permission=BlobSasPermissions(read=True),
+        expiry=datetime.now(timezone.utc) + timedelta(hours=expiry_hours),
+    )
+
+    account_url = os.getenv("AZURE_STORAGE_ACCOUNT_URL", "").strip()
+    if account_url:
+        base_url = account_url.rstrip("/")
+    else:
+        base_url = f"https://{account_name}.blob.core.windows.net"
+
+    return f"{base_url}/{container_name}/{blob_name}?{sas_token}"
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -63,7 +117,7 @@ def upload_file(
         content_settings=content_settings,
     )
 
-    return blob_client.url
+    return generate_sas_blob_url(container_name, target_blob_name)
 
 
 st.set_page_config(
@@ -186,7 +240,7 @@ with top_col_3:
         """
         <div class="info-card">
             <h3>Fast feedback</h3>
-            <p>See file metadata before upload and get a direct blob link once the transfer succeeds.</p>
+            <p>See file metadata before upload and get a secure temporary link once the transfer succeeds.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -295,13 +349,14 @@ if submitted:
             st.success("Upload completed successfully.")
             success_left, success_right = st.columns([1.2, 0.8])
             with success_left:
-                st.write(f"Uploaded blob URL: `{blob_url}`")
+                st.write(f"Secure blob URL: `{blob_url}`")
                 st.write(f"Container: `{container_name.strip()}`")
                 st.write(
                     f"Blob name: `{blob_name.strip() if blob_name.strip() else uploaded_file.name}`"
                 )
             with success_right:
                 st.link_button("Open blob", blob_url, use_container_width=True)
+                st.caption("This link is time-limited and keeps your storage account private.")
         except RuntimeError as exc:
             st.error(str(exc))
         except AzureError as exc:

@@ -1,8 +1,15 @@
 import os
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from urllib.parse import urlparse
 
 from azure.core.exceptions import AzureError
-from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.storage.blob import (
+    BlobSasPermissions,
+    BlobServiceClient,
+    ContentSettings,
+    generate_blob_sas,
+)
 from env_utils import load_local_env
 from flask import Flask, jsonify, render_template, request
 
@@ -29,6 +36,53 @@ def build_blob_service_client() -> BlobServiceClient:
     )
 
 
+def resolve_account_name_and_key() -> tuple[str, str]:
+    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "").strip()
+    account_url = os.getenv("AZURE_STORAGE_ACCOUNT_URL", "").strip()
+    account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "").strip()
+
+    if connection_string:
+        parts = {}
+        for item in connection_string.split(";"):
+            if "=" in item:
+                key, value = item.split("=", 1)
+                parts[key.strip()] = value.strip()
+        account_name = parts.get("AccountName", "")
+        connection_account_key = parts.get("AccountKey", "")
+        if account_name and connection_account_key:
+            return account_name, connection_account_key
+
+    if account_url and account_key:
+        parsed = urlparse(account_url)
+        account_name = parsed.netloc.split(".")[0]
+        if account_name:
+            return account_name, account_key
+
+    raise RuntimeError(
+        "Unable to generate a secure blob link. Make sure the storage account key is available."
+    )
+
+
+def generate_sas_blob_url(container_name: str, blob_name: str, expiry_hours: int = 1) -> str:
+    account_name, account_key = resolve_account_name_and_key()
+    sas_token = generate_blob_sas(
+        account_name=account_name,
+        container_name=container_name,
+        blob_name=blob_name,
+        account_key=account_key,
+        permission=BlobSasPermissions(read=True),
+        expiry=datetime.now(timezone.utc) + timedelta(hours=expiry_hours),
+    )
+
+    account_url = os.getenv("AZURE_STORAGE_ACCOUNT_URL", "").strip()
+    if account_url:
+        base_url = account_url.rstrip("/")
+    else:
+        base_url = f"https://{account_name}.blob.core.windows.net"
+
+    return f"{base_url}/{container_name}/{blob_name}?{sas_token}"
+
+
 def upload_file_to_blob(file_storage, container_name: str, blob_name: str, overwrite: bool) -> str:
     blob_service_client = build_blob_service_client()
     container_client = blob_service_client.get_container_client(container_name)
@@ -45,7 +99,7 @@ def upload_file_to_blob(file_storage, container_name: str, blob_name: str, overw
         overwrite=overwrite,
         content_settings=ContentSettings(content_type=content_type),
     )
-    return blob_client.url
+    return generate_sas_blob_url(container_name, blob_name)
 
 
 @app.get("/")
