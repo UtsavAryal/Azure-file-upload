@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Blob Uploader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <section class="hero">
+            <div class="hero-copy">
+                <span class="eyebrow">A new initiative for file uploading</span>
+                <h1>Upload files to Azure Blob Storage</h1>
+                <p>
+                    Run this page locally, connect it to your Azure Storage account,
+                    and upload files through a clean browser interface backed by Python.
+                </p>
+            </div>
+            <div class="hero-status">
+                <div class="status-card">
+                    <span class="label">Authentication</span>
+                    <strong id="authMode">{{ auth_mode }}</strong>
+                </div>
+                <div class="status-card">
+                    <span class="label">Default container</span>
+                    <strong id="defaultContainer">{{ default_container or "Not set" }}</strong>
+                </div>
+            </div>
+        </section>
+
+        <main class="content-grid">
+            <section class="panel">
+                <div class="panel-heading">
+                    <h2>Upload form</h2>
+                    <p>Pick a file, choose the target container, and send it to Azure.</p>
+                </div>
+
+                <form id="uploadForm" class="upload-form">
+                    <label>
+                        <span>Container name</span>
+                        <input
+                            type="text"
+                            id="containerName"
+                            name="container_name"
+                            value="{{ default_container }}"
+                            placeholder="uploads"
+                            required
+                        >
+                    </label>
+
+                    <label>
+                        <span>Blob name override</span>
+                        <input
+                            type="text"
+                            id="blobName"
+                            name="blob_name"
+                            placeholder="Optional custom path/file.ext"
+                        >
+                    </label>
+
+                    <label class="toggle-row">
+                        <input type="checkbox" id="overwrite" name="overwrite">
+                        <span>Overwrite existing blob if it already exists</span>
+                    </label>
+
+                    <label class="dropzone" for="fileInput" id="dropzone">
+                        <input type="file" id="fileInput" name="file" required>
+                        <span class="dropzone-title">Choose a file or drop it here</span>
+                        <span class="dropzone-subtitle">Any file type can be uploaded</span>
+                    </label>
+
+                    <button type="submit" id="submitButton">Upload to Azure</button>
+                </form>
+            </section>
+
+            <section class="panel side-panel">
+                <div class="panel-heading">
+                    <h2>Live details</h2>
+                    <p>See your selected file and the upload result in one place.</p>
+                </div>
+
+                <div class="detail-list">
+                    <div class="detail-card">
+                        <span class="label">Selected file</span>
+                        <strong id="fileName">No file selected</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span class="label">File type</span>
+                        <strong id="fileType">-</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span class="label">File size</span>
+                        <strong id="fileSize">-</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span class="label">Target blob</span>
+                        <strong id="targetBlob">-</strong>
+                    </div>
+                </div>
+
+                <div class="tips">
+                   
+
+                <div class="result" id="resultBox" hidden>
+                    <h3 id="resultTitle">Upload status</h3>
+                    <p id="resultMessage"></p>
+                    <a id="resultLink" href="#" target="_blank" rel="noreferrer" hidden>Open blob</a>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
