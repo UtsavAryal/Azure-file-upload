@@ -5,10 +5,10 @@ from typing import Optional
 import streamlit as st
 from azure.core.exceptions import AzureError
 from azure.storage.blob import BlobServiceClient, ContentSettings
-from dotenv import load_dotenv
+from env_utils import load_local_env
 
 
-load_dotenv()
+load_local_env()
 
 
 def build_blob_service_client() -> BlobServiceClient:

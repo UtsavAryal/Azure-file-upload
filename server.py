@@ -3,11 +3,11 @@ from io import BytesIO
 
 from azure.core.exceptions import AzureError
 from azure.storage.blob import BlobServiceClient, ContentSettings
-from dotenv import load_dotenv
+from env_utils import load_local_env
 from flask import Flask, jsonify, render_template, request
 
 
-load_dotenv()
+load_local_env()
 
 app = Flask(__name__)
 
