@@ -10,21 +10,27 @@
     <div class="page-shell">
         <section class="hero">
             <div class="hero-copy">
-                <span class="eyebrow">A new initiative for file uploading</span>
-                <h1>Upload files to Azure Blob Storage</h1>
+                <span class="eyebrow">A friendlier way to send files to Azure</span>
+                <h1>Upload a file without the cloud-tool headache</h1>
                 <p>
-                    Run this page locally, connect it to your Azure Storage account,
-                    and upload files through a clean browser interface backed by Python.
+                    Pick your file, choose where it should go, and let the app take care of the
+                    Azure Blob upload. Everything stays simple, local, and easy to understand.
                 </p>
+                <div class="hero-note">
+                    <span class="hero-note-title">Good to know</span>
+                    <span>Your file is uploaded from this local app using the Azure credentials saved in your `.env` file.</span>
+                </div>
             </div>
             <div class="hero-status">
                 <div class="status-card">
-                    <span class="label">Authentication</span>
+                    <span class="label">Connection</span>
                     <strong id="authMode">{{ auth_mode }}</strong>
+                    <p>The app will use whichever Azure setup you already configured.</p>
                 </div>
                 <div class="status-card">
                     <span class="label">Default container</span>
-                    <strong id="defaultContainer">{{ default_container or "Not set" }}</strong>
+                    <strong id="defaultContainer">{{ default_container or "Not set yet" }}</strong>
+                    <p>You can keep this value or change it before each upload.</p>
                 </div>
             </div>
         </section>
@@ -32,58 +38,69 @@
         <main class="content-grid">
             <section class="panel">
                 <div class="panel-heading">
-                    <h2>Upload form</h2>
-                    <p>Pick a file, choose the target container, and send it to Azure.</p>
+                    <h2>Let's upload your file</h2>
+                    <p>Fill in the details below, then press upload when you're ready.</p>
                 </div>
 
                 <form id="uploadForm" class="upload-form">
-                    <label>
-                        <span>Container name</span>
-                        <input
-                            type="text"
-                            id="containerName"
-                            name="container_name"
-                            value="{{ default_container }}"
-                            placeholder="uploads"
-                            required
-                        >
-                    </label>
+                    <div class="field-row">
+                        <label>
+                            <span>Container name</span>
+                            <input
+                                type="text"
+                                id="containerName"
+                                name="container_name"
+                                value="{{ default_container }}"
+                                placeholder="uploads"
+                                required
+                            >
+                            <small>The Azure Blob container where this file should be stored.</small>
+                        </label>
 
-                    <label>
-                        <span>Blob name override</span>
-                        <input
-                            type="text"
-                            id="blobName"
-                            name="blob_name"
-                            placeholder="Optional custom path/file.ext"
-                        >
-                    </label>
+                        <label>
+                            <span>Blob name</span>
+                            <input
+                                type="text"
+                                id="blobName"
+                                name="blob_name"
+                                placeholder="Optional custom path/file.ext"
+                            >
+                            <small>Leave this empty if you want to keep the original filename.</small>
+                        </label>
+                    </div>
 
                     <label class="toggle-row">
                         <input type="checkbox" id="overwrite" name="overwrite">
-                        <span>Overwrite existing blob if it already exists</span>
+                        <span>Replace the file if another blob with the same name already exists</span>
                     </label>
 
                     <label class="dropzone" for="fileInput" id="dropzone">
                         <input type="file" id="fileInput" name="file" required>
-                        <span class="dropzone-title">Choose a file or drop it here</span>
-                        <span class="dropzone-subtitle">Any file type can be uploaded</span>
+                        <span class="dropzone-kicker">Drop zone</span>
+                        <span class="dropzone-title">Choose a file or drag it here</span>
+                        <span class="dropzone-subtitle">Documents, images, zips, and other file types are all welcome.</span>
                     </label>
 
-                    <button type="submit" id="submitButton">Upload to Azure</button>
+                    <div class="form-footer">
+                        <div class="microcopy">
+                            <strong>Quick reminder:</strong>
+                            <span>The upload starts only when you click the button below.</span>
+                        </div>
+                        <button type="submit" id="submitButton">Upload file</button>
+                    </div>
                 </form>
             </section>
 
             <section class="panel side-panel">
                 <div class="panel-heading">
-                    <h2>Live details</h2>
-                    <p>See your selected file and the upload result in one place.</p>
+                    <h2>What's happening</h2>
+                    <p>A calm little summary so you always know what will be uploaded.</p>
                 </div>
 
                 <div class="detail-list">
                     <div class="detail-card">
                         <span class="label">Selected file</span>
-                        <strong id="fileName">No file selected</strong>
+                        <strong id="fileName">No file selected yet</strong>
                     </div>
                     <div class="detail-card">
                         <span class="label">File type</span>
@@ -94,18 +111,24 @@
                         <strong id="fileSize">-</strong>
                     </div>
                     <div class="detail-card">
-                        <span class="label">Target blob</span>
+                        <span class="label">Target blob name</span>
                         <strong id="targetBlob">-</strong>
                     </div>
                 </div>
 
                 <div class="tips">
-                   
+                    <h3>Before you press upload</h3>
+                    <ul>
+                        <li>Make sure your Azure credentials are saved in the local `.env` file.</li>
+                        <li>Check the container name if you want the file stored somewhere specific.</li>
+                        <li>Use a custom blob name only when you want to rename the uploaded file.</li>
+                    </ul>
+                </div>
 
                 <div class="result" id="resultBox" hidden>
                     <h3 id="resultTitle">Upload status</h3>
                     <p id="resultMessage"></p>
-                    <a id="resultLink" href="#" target="_blank" rel="noreferrer" hidden>Open blob</a>
+                    <a id="resultLink" href="#" target="_blank" rel="noreferrer" hidden>Open uploaded blob</a>
                 </div>
             </section>
         </main>

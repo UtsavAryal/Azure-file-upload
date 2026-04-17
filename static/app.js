@@ -30,10 +30,10 @@ function formatFileSize(size) {
 function updateFileDetails() {
     const file = fileInput.files[0];
     if (!file) {
-        fileName.textContent = "No file selected";
+        fileName.textContent = "No file selected yet";
         fileType.textContent = "-";
         fileSize.textContent = "-";
-        targetBlob.textContent = blobNameInput.value.trim() || "-";
+        targetBlob.textContent = blobNameInput.value.trim() || "Waiting for your file";
         return;
     }
 
@@ -47,7 +47,7 @@ function showResult(kind, message, url) {
     resultBox.hidden = false;
     resultBox.classList.remove("success", "error");
     resultBox.classList.add(kind);
-    resultTitle.textContent = kind === "success" ? "Upload complete" : "Upload failed";
+    resultTitle.textContent = kind === "success" ? "Your file made it" : "Something needs attention";
     resultMessage.textContent = message;
 
     if (url) {
@@ -97,7 +97,7 @@ form.addEventListener("submit", async (event) => {
     data.set("overwrite", document.getElementById("overwrite").checked ? "true" : "false");
 
     submitButton.disabled = true;
-    submitButton.textContent = "Uploading...";
+    submitButton.textContent = "Uploading your file...";
     resultBox.hidden = true;
 
     try {
@@ -120,7 +120,7 @@ form.addEventListener("submit", async (event) => {
         showResult("error", error.message);
     } finally {
         submitButton.disabled = false;
-        submitButton.textContent = "Upload to Azure";
+        submitButton.textContent = "Upload file";
     }
 });
 
