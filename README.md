@@ -12,12 +12,20 @@ pip install -r requirements.txt
 ```
 
 You can also create a local `.env` file in the project root. The app and Flask server load it automatically.
+Use `.env.example` as a starting point.
 
 Required configuration:
 
 - `AZURE_STORAGE_CONNECTION_STRING`
 - or both `AZURE_STORAGE_ACCOUNT_URL` and `AZURE_STORAGE_ACCOUNT_KEY`
 - optional `AZURE_STORAGE_CONTAINER`
+
+Authentication configuration:
+
+- optional `APP_USER_DB` to choose where local user accounts are stored
+- optional `FLASK_SECRET_KEY` for stable Flask sessions across restarts
+
+Users create accounts from the app with a Gmail address and password. Passwords are stored as hashes in the local SQLite database, which defaults to `users.db`.
 
 ## Run
 
@@ -37,12 +45,15 @@ Then open `http://127.0.0.1:5000` in your browser.
 
 ## Features
 
+- Gmail-address sign up, sign in, and logout for both the Flask and Streamlit apps
 - Upload a file from the browser
 - Styled frontend with a dashboard-like layout
 - Choose the Azure container at runtime
 - Optionally rename the blob before upload
 - Optional overwrite protection
-- File metadata preview before upload
+- File metadata and local previews before upload
+- Real-time upload progress in the Flask UI, including browser transfer and Azure handoff
+- Byte-aware Azure transfer progress in the Streamlit UI
 - Creates the container automatically if it does not already exist
 - Includes a local HTML frontend served by Flask
 - Returns a secure time-limited SAS link after upload for private storage accounts

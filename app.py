@@ -1,3 +1,5 @@
+import base64
+import html
 import os
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -12,10 +14,35 @@ from azure.storage.blob import (
     ContentSettings,
     generate_blob_sas,
 )
+from auth_utils import authenticate_user, create_user, get_user_by_id, init_user_store
 from env_utils import load_local_env
 
 
 load_local_env()
+init_user_store()
+
+TEXT_PREVIEW_BYTES = 96 * 1024
+TEXT_FILE_EXTENSIONS = {
+    "txt",
+    "csv",
+    "tsv",
+    "json",
+    "md",
+    "log",
+    "xml",
+    "html",
+    "css",
+    "js",
+    "ts",
+    "py",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "sql",
+    "yaml",
+    "yml",
+}
 
 
 def build_blob_service_client() -> BlobServiceClient:
@@ -92,11 +119,136 @@ def format_file_size(size_bytes: int) -> str:
     return f"{size_bytes} B"
 
 
+def get_file_extension(file_name: str) -> str:
+    if "." not in file_name:
+        return ""
+    return file_name.rsplit(".", 1)[-1].lower()
+
+
+def get_preview_kind(uploaded_file) -> str:
+    mime_type = uploaded_file.type or ""
+    extension = get_file_extension(uploaded_file.name)
+
+    if mime_type.startswith("image/"):
+        return "image"
+    if mime_type == "application/pdf" or extension == "pdf":
+        return "pdf"
+    if mime_type.startswith("video/"):
+        return "video"
+    if mime_type.startswith("audio/"):
+        return "audio"
+    if mime_type.startswith("text/") or extension in TEXT_FILE_EXTENSIONS:
+        return "text"
+    return "unsupported"
+
+
+def render_uploaded_file_preview(uploaded_file) -> None:
+    if not uploaded_file:
+        st.info("Choose a file to see a preview here.")
+        return
+
+    preview_kind = get_preview_kind(uploaded_file)
+    file_bytes = uploaded_file.getvalue()
+
+    if preview_kind == "image":
+        st.image(file_bytes, caption=uploaded_file.name, use_container_width=True)
+        return
+
+    if preview_kind == "pdf":
+        encoded_pdf = base64.b64encode(file_bytes).decode("ascii")
+        safe_title = html.escape(uploaded_file.name, quote=True)
+        st.markdown(
+            f"""
+            <iframe
+                title="Preview of {safe_title}"
+                src="data:application/pdf;base64,{encoded_pdf}"
+                style="width: 100%; min-height: 430px; border: 1px solid rgba(23, 53, 93, 0.12); border-radius: 14px;"
+            ></iframe>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    if preview_kind == "video":
+        st.video(file_bytes)
+        return
+
+    if preview_kind == "audio":
+        st.audio(file_bytes, format=uploaded_file.type or "audio/mpeg")
+        return
+
+    if preview_kind == "text":
+        preview_bytes = file_bytes[:TEXT_PREVIEW_BYTES]
+        preview_text = preview_bytes.decode("utf-8", errors="replace") or "(Empty file)"
+        st.code(preview_text, language=get_file_extension(uploaded_file.name) or "text")
+        if len(file_bytes) > TEXT_PREVIEW_BYTES:
+            st.caption(f"Showing the first {format_file_size(TEXT_PREVIEW_BYTES)} of this file.")
+        return
+
+    st.info("This file type can be uploaded, but it does not have an in-browser preview.")
+
+
+def render_login_gate() -> None:
+    user_id = st.session_state.get("user_id")
+    if user_id and get_user_by_id(user_id):
+        return
+
+    st.markdown(
+        """
+        <style>
+        [data-testid="stAppViewContainer"] > .main {
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.title("Gmail account access")
+    auth_mode = st.segmented_control("Choose an option", ["Sign in", "Sign up"], default="Sign in")
+
+    if auth_mode == "Sign up":
+        with st.form("signup_form"):
+            email = st.text_input("Gmail address", placeholder="name@gmail.com")
+            password = st.text_input("Password", type="password")
+            confirm_password = st.text_input("Confirm password", type="password")
+            submitted = st.form_submit_button("Create account", use_container_width=True)
+
+        if submitted:
+            if password != confirm_password:
+                st.error("Passwords do not match.")
+            else:
+                created, message, user = create_user(email, password)
+                if created and user:
+                    st.session_state["user_id"] = user["id"]
+                    st.session_state["email"] = user["email"]
+                    st.rerun()
+                else:
+                    st.error(message)
+    else:
+        with st.form("login_form"):
+            email = st.text_input("Gmail address", placeholder="name@gmail.com")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Sign in", use_container_width=True)
+
+        if submitted:
+            user = authenticate_user(email, password)
+            if user:
+                st.session_state["user_id"] = user["id"]
+                st.session_state["email"] = user["email"]
+                st.rerun()
+            else:
+                st.error("The Gmail address or password is incorrect.")
+
+    st.stop()
+
+
 def upload_file(
     uploaded_file,
     container_name: str,
     blob_name: Optional[str],
     overwrite: bool,
+    progress_callback=None,
 ) -> str:
     blob_service_client = build_blob_service_client()
     container_client = blob_service_client.get_container_client(container_name)
@@ -108,13 +260,19 @@ def upload_file(
     blob_client = container_client.get_blob_client(target_blob_name)
 
     file_bytes = uploaded_file.getvalue()
+    total_bytes = len(file_bytes)
     content_type = uploaded_file.type or "application/octet-stream"
     content_settings = ContentSettings(content_type=content_type)
+    upload_kwargs = {}
+    if progress_callback:
+        upload_kwargs["progress_hook"] = progress_callback
 
     blob_client.upload_blob(
         BytesIO(file_bytes),
+        length=total_bytes,
         overwrite=overwrite,
         content_settings=content_settings,
+        **upload_kwargs,
     )
 
     return generate_sas_blob_url(container_name, target_blob_name)
@@ -125,6 +283,8 @@ st.set_page_config(
     page_icon=":cloud:",
     layout="wide",
 )
+
+render_login_gate()
 
 st.markdown(
     """
@@ -247,6 +407,12 @@ with top_col_3:
     )
 
 with st.sidebar:
+    st.write(f"Signed in as **{st.session_state.get('email', 'User')}**")
+    if st.button("Log out", use_container_width=True):
+        st.session_state.pop("user_id", None)
+        st.session_state.pop("email", None)
+        st.rerun()
+    st.divider()
     st.subheader("Connection Guide")
     st.write("Add Azure settings as environment variables before starting the app.")
     st.code(
@@ -272,6 +438,12 @@ left_col, right_col = st.columns([1.35, 0.9], gap="large")
 with left_col:
     st.markdown('<div class="section-label">Upload file</div>', unsafe_allow_html=True)
     st.markdown('<div class="upload-panel">', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader(
+        "Choose a file",
+        type=None,
+        accept_multiple_files=False,
+        help="Any file type can be uploaded to Azure Blob Storage.",
+    )
     with st.form("upload_form", clear_on_submit=False):
         upload_col, name_col = st.columns(2)
         with upload_col:
@@ -286,12 +458,6 @@ with left_col:
                 placeholder="Optional custom filename or folder/file.ext",
             )
         overwrite = st.toggle("Overwrite existing blob if present", value=False)
-        uploaded_file = st.file_uploader(
-            "Choose a file",
-            type=None,
-            accept_multiple_files=False,
-            help="Any file type can be uploaded to Azure Blob Storage.",
-        )
         submitted = st.form_submit_button("Upload to Azure", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -318,8 +484,9 @@ with right_col:
             st.write(f"**Size:** `{format_file_size(uploaded_file.size)}`")
             if blob_name.strip():
                 st.write(f"**Target blob:** `{blob_name.strip()}`")
+            render_uploaded_file_preview(uploaded_file)
         else:
-            st.info("Select a file to see its upload details here.")
+            render_uploaded_file_preview(uploaded_file)
     with config_tab:
         st.code(
             "AZURE_STORAGE_CONNECTION_STRING=...\n"
@@ -336,14 +503,28 @@ if submitted:
     else:
         try:
             progress = st.progress(0, text="Preparing upload...")
-            progress.progress(25, text="Connecting to Azure Blob Storage...")
+            progress.progress(20, text="Connecting to Azure Blob Storage...")
+
+            def update_transfer_progress(transferred: int, total: int) -> None:
+                if total:
+                    percent = 30 + int((transferred / total) * 65)
+                    detail = (
+                        f"Uploading to Azure Blob Storage... "
+                        f"{format_file_size(transferred)} of {format_file_size(total)}"
+                    )
+                else:
+                    percent = 95
+                    detail = "Uploading empty file to Azure Blob Storage..."
+                progress.progress(min(percent, 95), text=detail)
+
             with st.spinner("Uploading file to Azure Blob Storage..."):
-                progress.progress(60, text="Transferring file...")
+                progress.progress(30, text="Starting Azure transfer...")
                 blob_url = upload_file(
                     uploaded_file=uploaded_file,
                     container_name=container_name.strip(),
                     blob_name=blob_name,
                     overwrite=overwrite,
+                    progress_callback=update_transfer_progress,
                 )
             progress.progress(100, text="Upload complete.")
             st.success("Upload completed successfully.")
@@ -361,3 +542,5 @@ if submitted:
             st.error(str(exc))
         except AzureError as exc:
             st.error(f"Azure upload failed: {exc}")
+        except Exception as exc:
+            st.error(f"Upload failed: {exc}")

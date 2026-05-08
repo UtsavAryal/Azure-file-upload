@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if mode == 'signup' %}Sign up{% else %}Sign in{% endif %} - Azure Blob Uploader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <main class="auth-shell">
+        <section class="auth-panel">
+            <span class="eyebrow">Gmail account access</span>
+            <h1>{% if mode == 'signup' %}Create your account{% else %}Sign in to continue{% endif %}</h1>
+            <p>
+                {% if mode == 'signup' %}
+                    Use a Gmail address to create your uploader account.
+                {% else %}
+                    Sign in with the Gmail address you used when signing up.
+                {% endif %}
+            </p>
+
+            <div class="auth-switch" aria-label="Authentication options">
+                <a href="{{ url_for('login', next=next_url) }}" class="{% if mode != 'signup' %}is-active{% endif %}">Sign in</a>
+                <a href="{{ url_for('signup') }}" class="{% if mode == 'signup' %}is-active{% endif %}">Sign up</a>
+            </div>
+
+            {% if error %}
+                <div class="auth-alert error">{{ error }}</div>
+            {% endif %}
+
+            {% if mode == 'signup' %}
+                <form class="auth-form" action="{{ url_for('signup_submit') }}" method="post">
+                    <label>
+                        <span>Gmail address</span>
+                        <input type="email" name="email" autocomplete="email" placeholder="name@gmail.com" required autofocus>
+                    </label>
+
+                    <label>
+                        <span>Password</span>
+                        <input type="password" name="password" autocomplete="new-password" minlength="8" required>
+                    </label>
+
+                    <label>
+                        <span>Confirm password</span>
+                        <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+                    </label>
+
+                    <button type="submit">Create account</button>
+                </form>
+            {% else %}
+                <form class="auth-form" action="{{ url_for('login_submit') }}" method="post">
+                    <input type="hidden" name="next" value="{{ next_url }}">
+
+                    <label>
+                        <span>Gmail address</span>
+                        <input type="email" name="email" autocomplete="email" placeholder="name@gmail.com" required autofocus>
+                    </label>
+
+                    <label>
+                        <span>Password</span>
+                        <input type="password" name="password" autocomplete="current-password" required>
+                    </label>
+
+                    <button type="submit">Sign in</button>
+                </form>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

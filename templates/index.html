@@ -8,13 +8,28 @@
 </head>
 <body>
     <div class="page-shell">
+        <header class="topbar">
+            <div class="window-dots" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div>
+                <span class="topbar-label">Signed in</span>
+                <strong>{{ username }}</strong>
+            </div>
+            <form action="{{ url_for('logout') }}" method="post">
+                <button type="submit" class="secondary-button">Log out</button>
+            </form>
+        </header>
+
         <section class="hero">
             <div class="hero-copy">
-                <span class="eyebrow">A friendlier way to send files to Azure</span>
-                <h1>Upload a file without the cloud-tool headache</h1>
+                <span class="eyebrow">Azure Blob Storage</span>
+                <h1>Upload File</h1>
                 <p>
-                    Pick your file, choose where it should go, and let the app take care of the
-                    Azure Blob upload. Everything stays simple, local, and easy to understand.
+                    Pick a local file, preview it, choose the Azure destination, and upload with
+                    progress you can follow from browser handoff to blob transfer.
                 </p>
             </div>
         </section>
@@ -22,8 +37,8 @@
         <main class="content-grid">
             <section class="panel">
                 <div class="panel-heading">
-                    <h2>Let's upload your file</h2>
-                    <p>Fill in the details below, then press upload when you're ready.</p>
+                    <h2>Upload File</h2>
+                    <p>Drag a file into the box or choose one from your computer.</p>
                 </div>
 
                 <form id="uploadForm" class="upload-form">
@@ -60,25 +75,50 @@
 
                     <label class="dropzone" for="fileInput" id="dropzone">
                         <input type="file" id="fileInput" name="file" required>
-                        <span class="dropzone-kicker">Drop zone</span>
-                        <span class="dropzone-title">Choose a file or drag it here</span>
-                        <span class="dropzone-subtitle">Documents, images, zips, and other file types are all welcome.</span>
+                        <span class="dropzone-kicker">File units · Azure Blob</span>
+                        <span class="dropzone-title">Drag and Drop files here</span>
+                        <span class="dropzone-or">or</span>
+                        <span class="dropzone-action">Add files</span>
+                        <span class="dropzone-subtitle">Documents, images, zips, videos, PDFs, and text files are supported.</span>
                     </label>
-
-                    <div class="form-footer">
-                        <div class="microcopy">
-                            <strong>Quick reminder:</strong>
-                            <span>The upload starts only when you click the button below.</span>
-                        </div>
-                        <button type="submit" id="submitButton">Upload file</button>
-                    </div>
                 </form>
             </section>
 
             <section class="panel side-panel">
                 <div class="panel-heading">
-                    <h2>What's happening</h2>
-                    <p>A calm little summary so you always know what will be uploaded.</p>
+                    <h2>Upload Queue</h2>
+                    <p>Preview the selected file and confirm the target before sending it.</p>
+                </div>
+
+                <div class="file-preview" id="filePreview">
+                    <div class="file-preview-head">
+                        <div>
+                            <span class="label">File preview</span>
+                            <strong id="previewTitle">No preview yet</strong>
+                        </div>
+                        <span class="preview-badge" id="previewBadge">Idle</span>
+                    </div>
+
+                    <div class="preview-loader" id="previewLoader" hidden>
+                        <div class="preview-loader-topline">
+                            <span id="previewLoaderText">Preparing preview...</span>
+                            <strong id="previewLoaderPercent">0%</strong>
+                        </div>
+                        <div
+                            class="preview-meter"
+                            id="previewMeter"
+                            role="progressbar"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="0"
+                        >
+                            <span id="previewFill"></span>
+                        </div>
+                    </div>
+
+                    <div class="preview-stage" id="previewStage">
+                        <p class="preview-empty">Choose a file to see a preview here.</p>
+                    </div>
                 </div>
 
                 <div class="detail-list">
@@ -100,6 +140,24 @@
                     </div>
                 </div>
 
+                <div class="progress-tracker" id="progressTracker" hidden aria-live="polite">
+                    <div class="progress-topline">
+                        <span id="progressStatus">Waiting to start</span>
+                        <strong id="progressPercent">0%</strong>
+                    </div>
+                    <div
+                        class="progress-meter"
+                        id="progressMeter"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="0"
+                    >
+                        <span id="progressFill"></span>
+                    </div>
+                    <p id="progressDetail">Progress appears here once the upload starts.</p>
+                </div>
+
                 <div class="tips">
                     <h3>Before you press upload</h3>
                     <ul>
@@ -116,6 +174,14 @@
                 </div>
             </section>
         </main>
+
+        <footer class="form-footer">
+            <div class="microcopy">
+                <strong>Upload files</strong>
+                <span>Please upload files for Azure Blob Storage.</span>
+            </div>
+            <button type="submit" id="submitButton" form="uploadForm">Upload file</button>
+        </footer>
     </div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>
