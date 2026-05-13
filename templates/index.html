@@ -178,6 +178,36 @@
             </section>
         </main>
 
+        <section class="file-system-panel" aria-labelledby="fileSystemTitle">
+            <div class="file-system-heading">
+                <div>
+                    <span class="eyebrow">Downloadable file system</span>
+                    <h2 id="fileSystemTitle">Stored Files</h2>
+                    <p>Browse files from the selected Azure Blob container and download them through this signed-in app session.</p>
+                </div>
+                <button type="button" class="secondary-button" id="refreshFilesButton">Refresh files</button>
+            </div>
+
+            <div class="file-system-status" id="fileSystemStatus" aria-live="polite">
+                Enter a container name above, then refresh to load downloadable files.
+            </div>
+
+            <div class="file-table-wrap" id="fileTableWrap" hidden>
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Blob name</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Size</th>
+                            <th scope="col">Modified</th>
+                            <th scope="col">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fileTableBody"></tbody>
+                </table>
+            </div>
+        </section>
+
         <footer class="form-footer">
             <div class="microcopy">
                 <strong>Upload files</strong>

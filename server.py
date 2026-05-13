@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from io import BytesIO
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from azure.core.exceptions import AzureError
 from azure.storage.blob import (
@@ -22,7 +22,7 @@ from auth_utils import (
     init_user_store,
 )
 from env_utils import load_local_env
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 
 
 load_local_env()
@@ -51,7 +51,7 @@ def login_required(view):
         if user_id and get_user_by_id(user_id):
             return view(*args, **kwargs)
 
-        if request.path.startswith(("/upload", "/progress")):
+        if request.path.startswith(("/upload", "/progress", "/files")):
             return jsonify({"ok": False, "error": "Please log in again."}), 401
 
         return redirect(url_for("login", next=request.full_path.rstrip("?")))
@@ -188,6 +188,35 @@ def generate_sas_blob_url(container_name: str, blob_name: str, expiry_hours: int
         base_url = f"https://{account_name}.blob.core.windows.net"
 
     return f"{base_url}/{container_name}/{blob_name}?{sas_token}"
+
+
+def format_blob_download_name(blob_name: str) -> str:
+    file_name = os.path.basename(blob_name.rstrip("/")) or "download"
+    fallback = file_name.replace("\\", "_").replace("/", "_").replace('"', "")
+    encoded_name = quote(file_name)
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded_name}"
+
+
+def serialize_blob(blob) -> dict:
+    return {
+        "name": blob.name,
+        "size": blob.size or 0,
+        "content_type": blob.content_settings.content_type
+        if blob.content_settings
+        else "application/octet-stream",
+        "last_modified": blob.last_modified.isoformat() if blob.last_modified else None,
+    }
+
+
+def list_container_blobs(container_name: str) -> list[dict]:
+    blob_service_client = build_blob_service_client()
+    container_client = blob_service_client.get_container_client(container_name)
+
+    if not container_client.exists():
+        return []
+
+    blobs = [serialize_blob(blob) for blob in container_client.list_blobs()]
+    return sorted(blobs, key=lambda blob: blob["name"].lower())
 
 
 def upload_file_to_blob(
@@ -409,6 +438,57 @@ def upload_progress(upload_id: str):
     response = jsonify(get_upload_progress(upload_id))
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.get("/files")
+@login_required
+def files():
+    container_name = request.args.get("container_name", "").strip()
+    if not container_name:
+        return jsonify({"ok": False, "error": "Container name is required."}), 400
+
+    try:
+        return jsonify({"ok": True, "files": list_container_blobs(container_name)})
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except AzureError as exc:
+        return jsonify({"ok": False, "error": f"Could not load files: {exc}"}), 500
+
+
+@app.get("/download")
+@login_required
+def download():
+    container_name = request.args.get("container_name", "").strip()
+    blob_name = request.args.get("blob_name", "").strip()
+
+    if not container_name or not blob_name:
+        return jsonify({"ok": False, "error": "Container name and blob name are required."}), 400
+
+    try:
+        blob_service_client = build_blob_service_client()
+        blob_client = blob_service_client.get_blob_client(
+            container=container_name,
+            blob=blob_name,
+        )
+        properties = blob_client.get_blob_properties()
+        stream = blob_client.download_blob()
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except AzureError as exc:
+        return jsonify({"ok": False, "error": f"Download failed: {exc}"}), 500
+
+    headers = {
+        "Content-Disposition": format_blob_download_name(blob_name),
+        "Content-Length": str(properties.size),
+        "Cache-Control": "no-store",
+    }
+    content_type = (
+        properties.content_settings.content_type
+        if properties.content_settings
+        else "application/octet-stream"
+    ) or "application/octet-stream"
+
+    return Response(stream.chunks(), headers=headers, mimetype=content_type)
 
 
 @app.post("/upload")

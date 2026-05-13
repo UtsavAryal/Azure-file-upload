@@ -1,8 +1,10 @@
 const form = document.getElementById("uploadForm");
 const fileInput = document.getElementById("fileInput");
+const containerNameInput = document.getElementById("containerName");
 const blobNameInput = document.getElementById("blobName");
 const dropzone = document.getElementById("dropzone");
 const submitButton = document.getElementById("submitButton");
+const refreshFilesButton = document.getElementById("refreshFilesButton");
 
 const fileName = document.getElementById("fileName");
 const fileType = document.getElementById("fileType");
@@ -29,6 +31,9 @@ const previewLoaderPercent = document.getElementById("previewLoaderPercent");
 const previewMeter = document.getElementById("previewMeter");
 const previewFill = document.getElementById("previewFill");
 const previewStage = document.getElementById("previewStage");
+const fileSystemStatus = document.getElementById("fileSystemStatus");
+const fileTableWrap = document.getElementById("fileTableWrap");
+const fileTableBody = document.getElementById("fileTableBody");
 
 let activeProgressTimer = null;
 let currentProgressPercent = 0;
@@ -70,6 +75,25 @@ function formatFileSize(size) {
     }
 
     return `${value.toFixed(1)} ${units[index]}`;
+}
+
+function formatDateTime(value) {
+    if (!value) {
+        return "-";
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return "-";
+    }
+
+    return parsed.toLocaleString([], {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
 }
 
 function getFileExtension(fileName) {
@@ -442,6 +466,96 @@ function showResult(kind, message, url) {
     }
 }
 
+function setFileSystemStatus(message, state = "") {
+    fileSystemStatus.classList.remove("is-error");
+    if (state) {
+        fileSystemStatus.classList.add(`is-${state}`);
+    }
+    fileSystemStatus.textContent = message;
+}
+
+function buildDownloadUrl(containerName, blobName) {
+    const params = new URLSearchParams({
+        container_name: containerName,
+        blob_name: blobName
+    });
+    return `/download?${params.toString()}`;
+}
+
+function renderFileSystem(containerName, files) {
+    fileTableBody.replaceChildren();
+
+    if (!files.length) {
+        fileTableWrap.hidden = true;
+        setFileSystemStatus(`No files were found in ${containerName}.`);
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    files.forEach((file) => {
+        const row = document.createElement("tr");
+
+        const nameCell = document.createElement("td");
+        nameCell.textContent = file.name;
+        nameCell.title = file.name;
+
+        const typeCell = document.createElement("td");
+        typeCell.textContent = file.content_type || "application/octet-stream";
+
+        const sizeCell = document.createElement("td");
+        sizeCell.textContent = formatFileSize(Number(file.size) || 0);
+
+        const modifiedCell = document.createElement("td");
+        modifiedCell.textContent = formatDateTime(file.last_modified);
+
+        const actionCell = document.createElement("td");
+        const link = document.createElement("a");
+        link.href = buildDownloadUrl(containerName, file.name);
+        link.textContent = "Download";
+        link.setAttribute("download", "");
+        actionCell.appendChild(link);
+
+        row.append(nameCell, typeCell, sizeCell, modifiedCell, actionCell);
+        fragment.appendChild(row);
+    });
+
+    fileTableBody.appendChild(fragment);
+    fileTableWrap.hidden = false;
+    setFileSystemStatus(`Loaded ${files.length} file${files.length === 1 ? "" : "s"} from ${containerName}.`);
+}
+
+async function loadFileSystem() {
+    const containerName = containerNameInput.value.trim();
+
+    if (!containerName) {
+        fileTableWrap.hidden = true;
+        setFileSystemStatus("Enter a container name above, then refresh to load downloadable files.", "error");
+        return;
+    }
+
+    refreshFilesButton.disabled = true;
+    setFileSystemStatus(`Loading files from ${containerName}...`);
+
+    try {
+        const params = new URLSearchParams({ container_name: containerName });
+        const response = await fetch(`/files?${params.toString()}`, {
+            cache: "no-store"
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "Could not load files.");
+        }
+
+        renderFileSystem(containerName, payload.files || []);
+    } catch (error) {
+        fileTableWrap.hidden = true;
+        setFileSystemStatus(error.message || "Could not load files.", "error");
+    } finally {
+        refreshFilesButton.disabled = false;
+    }
+}
+
 ["dragenter", "dragover"].forEach((eventName) => {
     dropzone.addEventListener(eventName, (event) => {
         event.preventDefault();
@@ -466,6 +580,11 @@ dropzone.addEventListener("drop", (event) => {
 
 fileInput.addEventListener("change", handleFileSelection);
 blobNameInput.addEventListener("input", updateFileDetails);
+containerNameInput.addEventListener("input", () => {
+    fileTableWrap.hidden = true;
+    setFileSystemStatus("Container changed. Refresh to load downloadable files.");
+});
+refreshFilesButton.addEventListener("click", loadFileSystem);
 
 form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -538,6 +657,7 @@ form.addEventListener("submit", (event) => {
                 `Uploaded ${payload.file_name} to ${payload.container_name} as ${payload.blob_name}.`,
                 payload.blob_url
             );
+            loadFileSystem();
         }
 
         stopProgressPolling();
@@ -561,3 +681,6 @@ form.addEventListener("submit", (event) => {
 updateFileDetails();
 resetFilePreview();
 resetProgress();
+if (containerNameInput.value.trim()) {
+    loadFileSystem();
+}

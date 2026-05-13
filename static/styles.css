@@ -160,6 +160,114 @@ button.secondary-button:hover {
     background: #ffffff;
 }
 
+.file-system-panel {
+    padding: 0 3rem 2.1rem;
+    background: #ffffff;
+}
+
+.file-system-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.95rem;
+}
+
+.file-system-heading h2 {
+    margin: 0;
+    color: #2f3542;
+    font-size: 1.22rem;
+    line-height: 1.2;
+}
+
+.file-system-heading p {
+    max-width: 44rem;
+    margin: 0.42rem 0 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+
+.file-system-status {
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    color: #687386;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.file-system-status.is-error {
+    border-color: rgba(240, 90, 99, 0.28);
+    background: rgba(240, 90, 99, 0.1);
+    color: #cb3e4a;
+}
+
+.file-table-wrap {
+    margin-top: 0.9rem;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #ffffff;
+}
+
+.file-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+}
+
+.file-table th,
+.file-table td {
+    padding: 0.78rem 0.9rem;
+    border-bottom: 1px solid var(--line);
+    color: #4b5568;
+    font-size: 0.78rem;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.file-table th {
+    background: var(--surface);
+    color: #515a6b;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.file-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.file-table td:first-child {
+    max-width: 24rem;
+    overflow: hidden;
+    color: #343b4c;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-table a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    border-radius: 3px;
+    padding: 0 0.72rem;
+    background: var(--accent-soft);
+    color: #0b76c1;
+    font-size: 0.76rem;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.file-table a:hover {
+    background: #d9efff;
+}
+
 .panel {
     min-width: 0;
 }
@@ -789,12 +897,18 @@ input[type="password"]:focus {
     }
 
     .hero,
-    .content-grid {
+    .content-grid,
+    .file-system-panel {
         padding-inline: 1.25rem;
     }
 
     .field-row {
         grid-template-columns: 1fr;
+    }
+
+    .file-system-heading {
+        align-items: stretch;
+        flex-direction: column;
     }
 }
 
